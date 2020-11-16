@@ -17,10 +17,7 @@
 package com.example.android.trackmysleepquality.sleeptracker
 
 import android.app.Application
-import androidx.lifecycle.AndroidViewModel
-import androidx.lifecycle.MutableLiveData
-import androidx.lifecycle.Transformations
-import androidx.lifecycle.viewModelScope
+import androidx.lifecycle.*
 import com.example.android.trackmysleepquality.database.SleepDatabaseDao
 import com.example.android.trackmysleepquality.database.SleepNight
 import com.example.android.trackmysleepquality.formatNights
@@ -38,6 +35,14 @@ class SleepTrackerViewModel(
         formatNights(nights, application.resources)
     }
 
+    private val _navigateToSleepQuality = MutableLiveData<SleepNight>()
+    val navigateToSleepQuality : LiveData<SleepNight>
+        get() = _navigateToSleepQuality
+
+    private val _showSnackbarEvent = MutableLiveData<Boolean>()
+    val showSnackbarEvent : LiveData<Boolean>
+        get() = _showSnackbarEvent
+
     private var tonight = MutableLiveData<SleepNight?>()
 
     init {
@@ -48,6 +53,18 @@ class SleepTrackerViewModel(
         viewModelScope.launch {
             tonight.value = getTonightFromDatabase()
         }
+    }
+
+    val startButtonEnabled = Transformations.map(tonight) {
+        tonight -> tonight == null
+    }
+
+    val stopButtonEnabled = Transformations.map(tonight) {
+        tonight -> tonight != null
+    }
+
+    val clearButtonEnabled = Transformations.map(nights) {
+        nights -> nights?.isNotEmpty()
     }
 
     private suspend fun getTonightFromDatabase() : SleepNight? {
@@ -76,6 +93,7 @@ class SleepTrackerViewModel(
             val oldNight = tonight.value ?: return@launch
             oldNight.endTimeMilli = System.currentTimeMillis()
             update(oldNight)
+            _navigateToSleepQuality.value = oldNight
         }
     }
 
@@ -86,11 +104,21 @@ class SleepTrackerViewModel(
     fun onClear() {
         viewModelScope.launch {
             clear()
+            _showSnackbarEvent.value = true
+            tonight.value = getTonightFromDatabase()
         }
     }
 
     private suspend fun clear() {
         database.clear()
+    }
+
+    fun doneNavigating() {
+        _navigateToSleepQuality.value = null
+    }
+
+    fun doneShowingSnackbar() {
+        _showSnackbarEvent.value = false
     }
 
     override fun onCleared() {
